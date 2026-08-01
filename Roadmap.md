@@ -1,0 +1,1 @@
+1.Licence ee=Meidön täytyy poistaa enterprise osat koodista, jotta koodi on MIT lisenssin alaista
