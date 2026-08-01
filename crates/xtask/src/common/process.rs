@@ -50,12 +50,9 @@ pub async fn kill_meili(mut meilisearch: tokio::process::Child) {
 }
 
 #[tracing::instrument]
-async fn build(edition: Edition) -> anyhow::Result<()> {
+async fn build(_edition: Edition) -> anyhow::Result<()> {
     let mut command = TokioCommand::new("cargo");
     command.arg("build").arg("--release").arg("-p").arg("meilisearch");
-    if let Edition::Enterprise = edition {
-        command.arg("--features=enterprise");
-    }
 
     command.kill_on_drop(true);
 
@@ -87,9 +84,6 @@ pub async fn start_meili(
                 .arg("meilisearch")
                 .arg("--bin")
                 .arg("meilisearch");
-            if let Edition::Enterprise = *edition {
-                command.arg("--features=enterprise");
-            }
             command.arg("--");
             command
         }

@@ -15,12 +15,11 @@ env:
 
 jobs:
   test-linux:
-    name: Tests on ${{ matrix.runner }} ${{ matrix.features }}
+    name: Tests on ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         runner: [ubuntu-22.04, ubuntu-22.04-arm]
-        features: ["", "--features enterprise"]
     steps:
       - uses: actions/checkout@v6
       - name: check free space before
@@ -37,12 +36,10 @@ jobs:
         uses: dtolnay/rust-toolchain@1.91.1
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2.9.1
-        with:
-          key: ${{ matrix.features }}
       - name: Run cargo build without any default features
         run: cargo build --locked --no-default-features --all
       - name: Run cargo test
-        run: cargo test --locked --all ${{ matrix.features }}
+        run: cargo test --locked --all
 
   test-windows:
     name: Tests on ${{ matrix.os }}
@@ -51,7 +48,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-2022]
-        features: ["", "--features enterprise"]
     if: github.event_name != 'merge_group'
     steps:
       - uses: actions/checkout@v6
@@ -61,7 +57,7 @@ jobs:
       - name: Run cargo build without any default features
         run: cargo build --locked --no-default-features --all
       - name: Run cargo test
-        run: cargo test --locked --all ${{ matrix.features }}
+        run: cargo test --locked --all
 
   test-macos:
     name: Tests on ${{ matrix.os }}
@@ -70,7 +66,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-14]
-        features: ["", "--features enterprise"]
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v6
@@ -80,7 +75,7 @@ jobs:
       - name: Run cargo build without any default features
         run: cargo build --locked --no-default-features --all
       - name: Run cargo test
-        run: cargo test --locked --all ${{ matrix.features }}
+        run: cargo test --locked --all
 
   test-all-features:
     name: Tests almost all features
@@ -204,9 +199,6 @@ jobs:
   clippy:
     name: Run Clippy
     runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        features: ["", "--features enterprise"]
     steps:
       - uses: actions/checkout@v6
       - name: Clean space as per https://github.com/actions/virtual-environments/issues/709
@@ -221,7 +213,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2.9.1
       - name: Run cargo clippy
-        run: cargo clippy --all-targets ${{ matrix.features }} -- --deny warnings -D clippy::todo
+        run: cargo clippy --all-targets -- --deny warnings -D clippy::todo
 
   fmt:
     name: Run Rustfmt

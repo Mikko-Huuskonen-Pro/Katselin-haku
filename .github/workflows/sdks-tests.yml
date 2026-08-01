@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}
@@ -97,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}
@@ -128,7 +128,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}
@@ -156,7 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}
@@ -186,7 +186,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}
@@ -216,7 +216,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}
@@ -242,7 +242,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}
@@ -268,7 +268,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}
@@ -290,7 +290,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}
@@ -314,7 +314,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}
@@ -348,7 +348,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}
@@ -381,7 +381,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       meilisearch:
-        image: getmeili/meilisearch-enterprise:${{ needs.define-docker-image.outputs.docker-image }}
+        image: getmeili/meilisearch:${{ needs.define-docker-image.outputs.docker-image }}
         env:
           MEILI_MASTER_KEY: ${{ env.MEILI_MASTER_KEY }}
           MEILI_NO_ANALYTICS: ${{ env.MEILI_NO_ANALYTICS }}

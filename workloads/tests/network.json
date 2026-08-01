@@ -3,7 +3,7 @@
   "name": "network",
   "binary": {
     "source": "release",
-    "edition": "enterprise",
+    "edition": "community",
     "version": "1.28.0"
   },
   "assets": {

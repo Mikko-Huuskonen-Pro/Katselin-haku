@@ -19,8 +19,6 @@ use meilisearch_types::milli::vector::parsed_vectors::{ExplicitVectors, VectorOr
 use meilisearch_types::milli::{self, obkv_to_json, InternalError};
 use meilisearch_types::network::route;
 use meilisearch_types::settings::{self, SecretPolicy};
-use meilisearch_types::tasks::network::headers::SetHeader as _;
-use meilisearch_types::tasks::network::{ImportData, ImportMetadata, Origin};
 use meilisearch_types::tasks::{DetailsExportIndexSettings, ExportIndexSettings};
 use roaring::RoaringBitmap;
 use serde::Deserialize;
@@ -29,7 +27,6 @@ use serde_json::json;
 use super::MustStopProcessing;
 use crate::filter::parse_local_index_filter;
 use crate::processing::AtomicDocumentStep;
-use crate::utils::UreqRequestWrapper;
 use crate::{Error, IndexScheduler, Result, RoFeatures};
 
 type Response = http_client::ureq::http::Response<http_client::ureq::Body>;
@@ -118,7 +115,6 @@ impl IndexScheduler {
                 index_uid: uid,
                 payload_size,
                 override_settings: *override_settings,
-                export_mode: ExportMode::ExportRoute,
             };
             let total_documents = self.export_one_index(target, options, ctx)?;
 
@@ -141,8 +137,6 @@ impl IndexScheduler {
         ctx: ExportContext<'_>,
     ) -> Result<u64, Error> {
         let err = |err| Error::from_milli(err, Some(options.index_uid.to_string()));
-        let total_index_documents = ctx.universe.len();
-        let task_network = options.task_network(total_index_documents);
 
         let bearer = target.api_key.map(|api_key| format!("Bearer {api_key}"));
         let url = format!(
@@ -182,10 +176,6 @@ impl IndexScheduler {
                 retry(ctx.must_stop_processing, || {
                     let mut request = ctx.agent.post(&url);
 
-                    if let Some((import_data, origin, metadata)) = &task_network {
-                        request = set_network_ureq_headers(request, import_data, origin, metadata);
-                    }
-
                     if let Some(bearer) = bearer.as_ref() {
                         request = request.header(AUTHORIZATION, bearer);
                     }
@@ -201,9 +191,6 @@ impl IndexScheduler {
                 target.remote_name,
                 retry(ctx.must_stop_processing, || {
                     let mut request = ctx.agent.patch(&url);
-                    if let Some((import_data, origin, metadata)) = &task_network {
-                        request = set_network_ureq_headers(request, import_data, origin, metadata);
-                    }
                     if let Some(bearer) = &bearer {
                         request = request.header(AUTHORIZATION, bearer);
                     }
@@ -238,10 +225,6 @@ impl IndexScheduler {
                 retry(ctx.must_stop_processing, || {
                     let mut request = ctx.agent.patch(&url);
 
-                    if let Some((import_data, origin, metadata)) = &task_network {
-                        request = set_network_ureq_headers(request, import_data, origin, metadata);
-                    }
-
                     if let Some(bearer) = bearer.as_ref() {
                         request = request.header(AUTHORIZATION, bearer);
                     }
@@ -266,30 +249,12 @@ impl IndexScheduler {
             index_uid = options.index_uid
         );
 
-        // no document to send, but we must still send a task when performing network balancing
         if ctx.universe.is_empty() {
-            if let Some((import_data, network_change_origin, metadata)) = task_network {
-                let mut compressed_buffer = Vec::new();
-                // ignore control flow, we're returning anyway
-                let _ = send_buffer(
-                    b" ", // needs something otherwise meili complains about missing payload
-                    &mut compressed_buffer,
-                    ctx.must_stop_processing,
-                    ctx.agent,
-                    &documents_url,
-                    target.remote_name,
-                    bearer.as_deref(),
-                    Some(&(import_data, network_change_origin.clone(), metadata)),
-                    &err,
-                )?;
-            }
             return Ok(0);
         }
 
         let results = request_threads()
             .broadcast(|broadcast| {
-                let mut task_network = options.task_network(total_index_documents);
-
                 let index_rtxn = ctx.index.read_txn().map_err(milli::Error::from).map_err(err)?;
 
                 let mut buffer = Vec::new();
@@ -298,10 +263,6 @@ impl IndexScheduler {
                 for (i, docid) in ctx.universe.iter().enumerate() {
                     if i % broadcast.num_threads() != broadcast.index() {
                         continue;
-                    }
-                    if let Some((import_data, _, metadata)) = &mut task_network {
-                        import_data.document_count += 1;
-                        metadata.task_key = Some(docid);
                     }
 
                     let document = ctx.index.document(&index_rtxn, docid).map_err(err)?;
@@ -382,15 +343,10 @@ impl IndexScheduler {
                             &documents_url,
                             target.remote_name,
                             bearer.as_deref(),
-                            task_network.as_ref(),
                             &err,
                         )?;
                         buffer.clear();
                         compressed_buffer.clear();
-                        if let Some((import_data, _, metadata)) = &mut task_network {
-                            import_data.document_count = 0;
-                            metadata.task_key = None;
-                        }
                         if control_flow.is_break() {
                             return Ok(());
                         }
@@ -413,7 +369,6 @@ impl IndexScheduler {
                         &documents_url,
                         target.remote_name,
                         bearer.as_deref(),
-                        task_network.as_ref(),
                         &err,
                     )?;
                 }
@@ -427,215 +382,6 @@ impl IndexScheduler {
         step.store(total_documents, atomic::Ordering::Relaxed);
         Ok(total_documents as u64)
     }
-
-    #[cfg(feature = "enterprise")] // only used in enterprise edition for now
-    pub(super) fn export_no_index(
-        &self,
-        target: TargetInstance<'_>,
-        export_old_remote_name: &str,
-        network_change_origin: &Origin,
-        agent: &http_client::ureq::Agent,
-        must_stop_processing: &MustStopProcessing,
-    ) -> Result<(), Error> {
-        let bearer = target.api_key.map(|api_key| format!("Bearer {api_key}"));
-        let url = route::url_from_base_and_route(target.base_url, route::network_control_path())
-            .map_err(|error| Error::InvalidRemoteUrl {
-                url: target.base_url.to_owned(),
-                cause: error.to_string(),
-            })?;
-
-        {
-            let _ = handle_response(
-                target.remote_name,
-                retry(must_stop_processing, || {
-                    use http_client::ureq::http::header::CONTENT_TYPE;
-
-                    let mut request = agent.post(url.to_string());
-                    let body = route::NetworkChange {
-                        origin: network_change_origin.clone(),
-                        message: route::Message::ExportNoIndexForRemote {
-                            remote: export_old_remote_name.to_string(),
-                        },
-                    };
-
-                    request = request.header(CONTENT_TYPE, "application/json");
-                    if let Some(bearer) = &bearer {
-                        request = request.header(AUTHORIZATION, bearer);
-                    }
-                    request.send_json(body)
-                }),
-            )?;
-        }
-
-        Ok(())
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn export_dsr_index(
-        &self,
-        target: TargetInstance<'_>,
-        dsrs: &milli::dynamic_search_rules::DynamicSearchRules,
-        index_count: u64,
-        export_old_remote_name: &str,
-        network_change_origin: &Origin,
-        progress: &Progress,
-        agent: &http_client::ureq::Agent,
-        must_stop_processing: &MustStopProcessing,
-    ) -> Result<u64, Error> {
-        use meilisearch_types::dynamic_search_rules::DynamicSearchRule;
-        use meilisearch_types::index_uid::DsrIndex;
-        use meilisearch_types::milli::dynamic_search_rules::DynamicSearchRulesView;
-
-        let err = |err| Error::from_milli(err, Some(DsrIndex::dsr_uid().to_string()));
-
-        let bearer = target.api_key.map(|api_key| format!("Bearer {api_key}"));
-        let url =
-            route::url_from_base_and_route(target.base_url, route::dynamic_search_rules_path())
-                .map_err(|error| Error::InvalidRemoteUrl {
-                    url: target.base_url.to_owned(),
-                    cause: error.to_string(),
-                })?;
-
-        let options = ExportOptions {
-            index_uid: DsrIndex::dsr_uid(),
-            payload_size: None,
-            override_settings: true,
-            export_mode: ExportMode::NetworkBalancing {
-                index_count,
-                export_old_remote_name,
-                network_change_origin,
-            },
-        };
-
-        let all_rules = dsrs.all_rule_ids().map_err(err)?;
-        let url = url.to_string();
-
-        let mut task_network = options.task_network(all_rules.len());
-
-        if let Some((import_data, _, metadata)) = &mut task_network {
-            import_data.document_count = 0;
-            metadata.task_key = None;
-        }
-
-        if send_dsr_clear(
-            must_stop_processing,
-            agent,
-            &url,
-            target.remote_name,
-            bearer.as_deref(),
-            task_network.as_ref(),
-        )?
-        .is_break()
-        {
-            return Ok(0);
-        }
-
-        if all_rules.is_empty() {
-            return Ok(0);
-        }
-
-        let (step, progress_step) = AtomicDocumentStep::new(all_rules.len() as u32);
-        progress.update_progress(progress_step);
-
-        let (index, _, db_fields_ids_map) = dsrs.as_raw();
-
-        let results = request_threads()
-            .broadcast(|broadcast| -> Result<_, Error> {
-                let rtxn = index.read_txn().map_err(Into::into).map_err(err)?;
-                let dsrs = DynamicSearchRulesView::new(index, &rtxn, db_fields_ids_map);
-
-                let mut task_network = options.task_network(all_rules.len());
-
-                for (i, docid) in all_rules.iter().enumerate() {
-                    if i % broadcast.num_threads() != broadcast.index() {
-                        continue;
-                    }
-                    if let Some((import_data, _, metadata)) = &mut task_network {
-                        import_data.document_count = 1;
-                        metadata.task_key = None;
-                    }
-
-                    let dsr = dsrs
-                        .get_from_internal_id(docid)
-                        .transpose()
-                        .ok_or_else(|| {
-                            milli::UserError::UnknownInternalDocumentId { document_id: docid }
-                                .into()
-                        })
-                        .map_err(err)?
-                        .map_err(err)?;
-
-                    let dsr =
-                        DynamicSearchRule::try_from_meili_doc(dsr, milli::FaultSource::Runtime)
-                            .map_err(err)?;
-
-                    let (dsr_uid, dsr) = dsr.into_uid_update();
-
-                    if send_dsr(
-                        dsr_uid,
-                        dsr,
-                        must_stop_processing,
-                        agent,
-                        &url,
-                        target.remote_name,
-                        bearer.as_deref(),
-                        task_network.as_ref(),
-                    )?
-                    .is_break()
-                    {
-                        return Ok(());
-                    }
-
-                    if i > 0 && i % 100 == 0 {
-                        step.fetch_add(100, atomic::Ordering::Relaxed);
-                    }
-                }
-
-                Ok(())
-            })
-            .map_err(|e| err(milli::Error::InternalError(InternalError::PanicInThreadPool(e))))?;
-        for result in results {
-            result?;
-        }
-        step.store(all_rules.len() as u32, atomic::Ordering::Relaxed);
-        Ok(all_rules.len())
-    }
-}
-
-fn set_network_ureq_headers<P>(
-    request: http_client::ureq::RequestBuilder<P>,
-    import_data: &ImportData,
-    origin: &Origin,
-    metadata: &ImportMetadata,
-) -> http_client::ureq::RequestBuilder<P> {
-    let request = UreqRequestWrapper(request);
-
-    let ImportMetadata { index_count, task_key, total_index_documents } = metadata;
-    let Origin { remote_name: origin_remote, task_uid, network_version } = origin;
-    let ImportData { remote_name: import_remote, index_name, document_count } = import_data;
-
-    let request = request
-        .set_origin_remote(origin_remote)
-        .set_origin_task_uid(*task_uid)
-        .set_origin_network_version(*network_version)
-        .set_import_remote(import_remote)
-        .set_import_docs(*document_count)
-        .set_import_index_count(*index_count)
-        .set_import_index_docs(*total_index_documents);
-
-    let request = if let Some(index_name) = index_name.as_deref() {
-        request.set_import_index(index_name)
-    } else {
-        request
-    };
-    let UreqRequestWrapper(request) = if let Some(task_key) = task_key {
-        request.set_import_task_key(*task_key)
-    } else {
-        request
-    };
-
-    request
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -647,7 +393,6 @@ fn send_buffer<'a>(
     documents_url: &'a str,
     remote_name: Option<&str>,
     bearer: Option<&'a str>,
-    task_network: Option<&(ImportData, Origin, ImportMetadata)>,
     err: &'a impl Fn(milli::Error) -> crate::Error,
 ) -> Result<ControlFlow<(), ()>> {
     // We compress the documents before sending them
@@ -663,62 +408,7 @@ fn send_buffer<'a>(
         if let Some(bearer) = bearer {
             request = request.header(AUTHORIZATION, bearer);
         }
-        if let Some((import_data, origin, metadata)) = task_network {
-            request = set_network_ureq_headers(request, import_data, origin, metadata);
-        }
         request.send(compressed_buffer.as_slice())
-    });
-
-    handle_response(remote_name, res)
-}
-
-#[cfg(feature = "enterprise")]
-#[allow(clippy::too_many_arguments)]
-fn send_dsr<'a>(
-    dsr_uid: meilisearch_types::dynamic_search_rules::RuleUid,
-    dsr: meilisearch_types::dynamic_search_rules::DynamicSearchRuleUpdateRequest,
-    must_stop_processing: &MustStopProcessing,
-    agent: &http_client::ureq::Agent,
-    dsr_url: &'a str,
-    remote_name: Option<&str>,
-    bearer: Option<&'a str>,
-    task_network: Option<&(ImportData, Origin, ImportMetadata)>,
-) -> Result<ControlFlow<(), ()>> {
-    let dsr_url = format!("{dsr_url}/{dsr_uid}");
-    let res = retry(must_stop_processing, || {
-        let mut request = agent.patch(&dsr_url);
-        request = request.header("Content-Type", "application/json");
-        if let Some(bearer) = bearer {
-            request = request.header(AUTHORIZATION, bearer);
-        }
-        if let Some((import_data, origin, metadata)) = task_network {
-            request = set_network_ureq_headers(request, import_data, origin, metadata);
-        }
-        request.send_json(&dsr)
-    });
-
-    handle_response(remote_name, res)
-}
-
-#[cfg(feature = "enterprise")]
-#[allow(clippy::too_many_arguments)]
-fn send_dsr_clear<'a>(
-    must_stop_processing: &MustStopProcessing,
-    agent: &http_client::ureq::Agent,
-    dsr_url: &'a str,
-    remote_name: Option<&str>,
-    bearer: Option<&'a str>,
-    task_network: Option<&(ImportData, Origin, ImportMetadata)>,
-) -> Result<ControlFlow<(), ()>> {
-    let res = retry(must_stop_processing, || {
-        let mut request = agent.delete(dsr_url);
-        if let Some(bearer) = bearer {
-            request = request.header(AUTHORIZATION, bearer);
-        }
-        if let Some((import_data, origin, metadata)) = task_network {
-            request = set_network_ureq_headers(request, import_data, origin, metadata);
-        }
-        request.call()
     });
 
     handle_response(remote_name, res)
@@ -837,33 +527,6 @@ pub(super) struct ExportOptions<'a> {
     pub(super) index_uid: &'a str,
     pub(super) payload_size: Option<&'a Byte>,
     pub(super) override_settings: bool,
-    pub(super) export_mode: ExportMode<'a>,
-}
-
-impl ExportOptions<'_> {
-    fn task_network(
-        &self,
-        total_index_documents: u64,
-    ) -> Option<(ImportData, Origin, ImportMetadata)> {
-        if let ExportMode::NetworkBalancing {
-            index_count,
-            export_old_remote_name,
-            network_change_origin,
-        } = self.export_mode
-        {
-            Some((
-                ImportData {
-                    remote_name: export_old_remote_name.to_string(),
-                    index_name: Some(self.index_uid.to_string()),
-                    document_count: 0,
-                },
-                network_change_origin.clone(),
-                ImportMetadata { index_count, task_key: None, total_index_documents },
-            ))
-        } else {
-            None
-        }
-    }
 }
 
 pub(super) struct ExportContext<'a> {
@@ -874,17 +537,6 @@ pub(super) struct ExportContext<'a> {
     pub(super) agent: &'a http_client::ureq::Agent,
     pub(super) must_stop_processing: &'a MustStopProcessing,
     pub(super) features: RoFeatures,
-}
-
-pub(super) enum ExportMode<'a> {
-    ExportRoute,
-    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
-    NetworkBalancing {
-        index_count: u64,
-
-        export_old_remote_name: &'a str,
-        network_change_origin: &'a Origin,
-    },
 }
 
 // progress related

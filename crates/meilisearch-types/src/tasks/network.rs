@@ -12,13 +12,7 @@ use crate::error::ResponseError;
 use crate::network::Network;
 use crate::tasks::{Details, TaskId};
 
-#[cfg(not(feature = "enterprise"))]
 mod community_edition;
-#[cfg(feature = "enterprise")]
-mod enterprise_edition;
-
-#[cfg(feature = "enterprise")]
-pub use enterprise_edition::{ExportMode, ExportShard};
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(untagged, rename_all = "camelCase")]

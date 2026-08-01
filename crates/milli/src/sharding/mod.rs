@@ -1,7 +1,4 @@
-#[cfg(not(feature = "enterprise"))]
 pub mod community_edition;
-#[cfg(feature = "enterprise")]
-pub mod enterprise_edition;
 use std::collections::BTreeSet;
 
 use heed::types::{Bytes, DecodeIgnore, Str};

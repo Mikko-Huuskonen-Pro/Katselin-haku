@@ -38,21 +38,14 @@ jobs:
         run: bash .github/scripts/check-release.sh
 
   publish-binaries:
-    name: Publish binary for ${{ matrix.release }} ${{ matrix.edition }} edition
+    name: Publish binary for ${{ matrix.release }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        edition: [community, enterprise]
         release:
           [macos-amd64, macos-aarch64, windows, linux-amd64, linux-aarch64, linux-riscv64]
         include:
-          - edition: "community"
-            feature-flag: ""
-            edition-suffix: ""
-          - edition: "enterprise"
-            feature-flag: "--features enterprise"
-            edition-suffix: "enterprise-"
           - release: macos-amd64
             os: macos-15-intel
             binary_path: release/meilisearch
@@ -95,7 +88,7 @@ jobs:
         shell: bash
         env:
           BUILD_TOOL: ${{ matrix.use_cross && 'cross' || 'cargo' }}
-        run: $BUILD_TOOL build --release --locked ${{ matrix.feature-flag }} ${{ matrix.extra-args }}
+        run: $BUILD_TOOL build --release --locked ${{ matrix.extra-args }}
       # No need to upload binaries for dry run (cron or workflow_dispatch)
       - name: Upload binaries to release
         if: github.event_name == 'release'
@@ -103,7 +96,7 @@ jobs:
         with:
           repo_token: ${{ secrets.MEILI_BOT_GH_PAT }}
           file: target/${{ matrix.binary_path }}
-          asset_name: meilisearch-${{ matrix.edition-suffix }}${{ matrix.asset_name }}
+          asset_name: meilisearch-${{ matrix.asset_name }}
           tag: ${{ github.ref }}
 
   publish-openapi-files:

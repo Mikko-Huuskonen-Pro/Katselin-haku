@@ -20,10 +20,7 @@ pub struct Release {
 impl Display for Release {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "v{}", self.version)?;
-        match self.edition {
-            Edition::Community => f.write_str(" Community Edition"),
-            Edition::Enterprise => f.write_str(" Enterprise Edition"),
-        }
+        f.write_str(" Community Edition")
     }
 }
 

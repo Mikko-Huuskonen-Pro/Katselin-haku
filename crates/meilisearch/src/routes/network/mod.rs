@@ -24,15 +24,8 @@ use crate::error::MeilisearchHttpError;
 use crate::extractors::authentication::policies::ActionPolicy;
 use crate::extractors::authentication::GuardedData;
 
-#[cfg(not(feature = "enterprise"))]
 mod community_edition;
-
-#[cfg(feature = "enterprise")]
-mod enterprise_edition;
-#[cfg(not(feature = "enterprise"))]
 use community_edition as current_edition;
-#[cfg(feature = "enterprise")]
-use enterprise_edition as current_edition;
 
 #[routes::routes(
     routes(

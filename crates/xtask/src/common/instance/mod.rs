@@ -73,12 +73,7 @@ pub enum BinarySource {
 impl Display for BinarySource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BinarySource::Build { edition: Edition::Community } => {
-                f.write_str("git with community edition")
-            }
-            BinarySource::Build { edition: Edition::Enterprise } => {
-                f.write_str("git with enterprise edition")
-            }
+            BinarySource::Build { .. } => f.write_str("git with community edition"),
             BinarySource::Release(release) => write!(f, "{release}"),
             BinarySource::Path(path) => write!(f, "binary at `{}`", path.display()),
         }
@@ -106,14 +101,10 @@ impl BinarySource {
 pub enum Edition {
     #[default]
     Community,
-    Enterprise,
 }
 
 impl Edition {
     fn binary_base(&self) -> &'static str {
-        match self {
-            Edition::Community => "meilisearch",
-            Edition::Enterprise => "meilisearch-enterprise",
-        }
+        "meilisearch"
     }
 }
