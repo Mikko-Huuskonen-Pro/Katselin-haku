@@ -1,0 +1,17 @@
+[package]
+name = "katselin-lmdb-android"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "liblmdb"
+path = "src/main.rs"
+
+[dependencies]
+# Same heed version + serde profile as milli (crates/milli/Cargo.toml).
+# Do NOT enable heed/posix-sem on Android: bionic has no named sem_open → ENOSYS.
+# With NDK (__ANDROID__), LMDB defaults to MDB_USE_POSIX_MUTEX (+ MDB_USE_ROBUST=0).
+# (milli's lmdb-posix-sem is for Apple App Sandbox, not Android.)
+heed = { version = "0.22.1", default-features = false, features = ["serde-json"] }
+
+[workspace]

@@ -1,0 +1,10 @@
+[package]
+name = "katselin-hello-android"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "libhello"
+path = "src/main.rs"
+
+[workspace]

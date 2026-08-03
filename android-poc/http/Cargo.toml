@@ -1,0 +1,10 @@
+[package]
+name = "katselin-http-android"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "libhttp"
+path = "src/main.rs"
+
+[workspace]
