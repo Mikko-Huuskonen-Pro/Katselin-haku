@@ -2,7 +2,9 @@
 
 Päivämäärä: 2.8.2026
 
-Status: Luonnos (v1)
+Päivitetty: 3.8.2026 – lisätty paketointivaatimukset/integraatiokontrahti (Katselin-päärepo) ja fallback-viittaus
+
+Status: Luonnos (v1.1)
 
 ---
 
@@ -75,12 +77,12 @@ Esimerkiksi
 ```
 
 fn main() {
-println("Hello Android");
+println!("Hello Android");
 }
 
 ```
 
-Paketoidaan se APK:n native library directoryyn.
+Paketoidaan se APK:n native library directoryyn nimellä `libhello.so` (jniLibs-kaavio, ks. paketointivaatimukset alla).
 
 Tavoite:
 
@@ -88,7 +90,7 @@ Tavoite:
 - stdout näkyy logcatissa
 - exec onnistuu
 
-Jos tämä epäonnistuu, koko arkkitehtuuri muuttuu.
+Jos tämä epäonnistuu, koko arkkitehtuuri muuttuu. Fallback tällöin: `seed_search`-varahaku rikastetaan (ks. Kotisatama `support/android/INTEGRAATIO-SUUNNITELMA.md`, vaihe 3) ja projekti keskeytetään.
 
 ---
 
@@ -254,6 +256,22 @@ joka rakentaa
 - x86_64
 
 artefaktit automaattisesti.
+
+---
+
+# Paketointivaatimukset (integraatiokontrahti)
+
+Kuluttaja on Katselin-päärepo (android/apk), ei Kotisatama-forkki suoraan (ks. `Katselin/docs/REPO-JAKO-SUUNNITELMA.md`).
+
+Binäärin ja APK-puolen on sovittava seuraavista:
+
+- Artefakti: PIE-suoritettava binääri (Rust tuottaa oletuksena; Android vaatii PIE:n)
+- Nimi APK:ssa: `libmeilisearch.so` (jniLibs-kaavio: `jniLibs/arm64-v8a/` + `jniLibs/x86_64/`)
+- Manifest: `android:extractNativeLibs="true"` pakollinen (muuten .so:tä ei purkaa levylle eikä exec onnistu)
+- Ajonaikainen polku: `${ApplicationInfo.nativeLibraryDir}/libmeilisearch.so` → `KOTISATAMA_MEILISEARCH_BIN`
+- Jakelu: GitHub Releases -artefaktit per abi (arm64, x86_64), versiointi sidottu Katselin-julkaisuihin
+
+PoC 1 validoi tämän kontrahdin pienimmällä binäärillä ennen Meilisearch-käännöstä.
 
 ---
 
