@@ -32,3 +32,9 @@ crates/milli/fuzz/update::facet::incremental::fuzz::fuzz/
 
 # OpenAPI generator
 **/meilisearch-openapi.json
+
+# Android PoC / NDK build artifacts
+android-poc/**/target/
+android-poc/**/Cargo.lock
+android/**/*.log
+poc/
