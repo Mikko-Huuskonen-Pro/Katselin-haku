@@ -26,7 +26,8 @@ use tracing::level_filters::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::Layer;
 
-#[cfg(not(windows))]
+// KOTISATAMA-PATCH: Android uses system allocator — mimalloc/NDK is unreliable.
+#[cfg(not(any(windows, target_os = "android")))]
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
